@@ -3,6 +3,7 @@
 #@category Functions.Python
 import ghidra.app.util.headless.HeadlessScript
 import binascii
+import os
 
 
 #Important constant values
@@ -44,8 +45,11 @@ def retrieveMainFunc(start, end):
 def retrieveEntryPointFunction():
     entryPointLocation = currentAddress.add(ENTRY_POINT_OFFSET)
     temp = getBytes(entryPointLocation,8)[::-1]
-    temp[5] = GHIDRA_OFFSET
-    hexArray = binascii.hexlify(temp)
+    #This is technically a long, so GHIDRA_OFFSET will also contain a 'L' which needs to be removed.
+    GHIDRA_OFFSET = currentProgram.getImageBase().getUnsignedOffset()
+    tempArray = binascii.hexlify(temp)
+    #removing 'L' to allow for proper conversion in getAddress function.
+    hexArray = hex(GHIDRA_OFFSET + int(tempArray,16)).rstrip("L")
     newAddress = currentAddress.getAddress(hexArray)
     entryPoint = getFunctionContaining(newAddress)
 
@@ -64,6 +68,10 @@ def verify64Bit():
     start function and then to main.
 '''
 if __name__ == "__main__":
+
+    print(currentProgram.getName())
+    print(currentProgram.getExecutablePath())
+    print(currentProgram.getImageBase())
 
     if True == verify64Bit():
         startFunction = retrieveEntryPointFunction()
