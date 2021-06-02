@@ -4,14 +4,16 @@
 import ghidra.app.util.headless.HeadlessScript
 import binascii
 import os
-
+import json
+import sys
 
 #Important constant values
-#Offset within header where entry point is
-ENTRY_POINT_OFFSET          = 24
-GHIDRA_OFFSET               = 0x10
 ELF_32BIT                   = 0x1
 ELF_64BIT                   = 0x2
+ENTRY_POINT_OFFSET          = 24
+#Not a great choice, looking for improvements
+HOME_DIR                    = os.path.expanduser("~")+"/.cycle2Output"
+
 
 def retrieveNonThunkFunctionCalls(startAddr, endAddr):
     movingAddr = startAddr
@@ -69,9 +71,15 @@ def verify64Bit():
 '''
 if __name__ == "__main__":
 
-    print(currentProgram.getName())
-    print(currentProgram.getExecutablePath())
-    print(currentProgram.getImageBase())
+    programName = currentProgram.getName()
+    programPath = currentProgram.getExecutablePath().rstrip(programName)
+
+    programInfo = dict()
+    programInfo["Path"] = programPath
+    programInfo["Name"] = programName
+
+    if not os.path.exists(HOME_DIR):
+        os.mkdir(HOME_DIR)
 
     if True == verify64Bit():
         startFunction = retrieveEntryPointFunction()
@@ -83,10 +91,14 @@ if __name__ == "__main__":
             mainFunc = retrieveMainFunc(beginRange, endRange)
             callInstrAddr = retrieveNonThunkFunctionCalls(mainFunc.getBody().getMinAddress(), mainFunc.getBody().getMaxAddress())
 
+            callInstr = dict()
             for x in callInstrAddr:
                 instr = getInstructionAt(x)
-                print(getFunctionContaining(instr.getPrimaryReference(0).getToAddress()).getName())
-            
+                callInstr[getFunctionContaining(instr.getPrimaryReference(0).getToAddress()).getName()] = instr.getPrimaryReference(0).getToAddress().toString()
 
+            programInfo["FunctionsCalled"] = callInstr
+    
+        with open(HOME_DIR+"/"+programName+"output.json", "w") as outputFile:
+            json.dump(programInfo, outputFile)
     else:
         print("Must not be 64 bit")
