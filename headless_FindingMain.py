@@ -73,10 +73,11 @@ if __name__ == "__main__":
             endRange = startFunction.getBody().getMaxAddress()
             
             mainFunc = retrieveMainFunc(beginRange, endRange)
-            calledFunctions = retrieveNonThunkFunctionCalls(mainFunc.getBody().getMinAddress(), mainFunc.getBody().getMaxAddress())
+            callInstrAddr = retrieveNonThunkFunctionCalls(mainFunc.getBody().getMinAddress(), mainFunc.getBody().getMaxAddress())
 
-            for x in calledFunctions:
-                print(x.getName())
+            for x in callInstrAddr:
+                instr = getInstructionAt(x)
+                print(getFunctionContaining(instr.getPrimaryReference(0).getToAddress()).getName())
             
 
     else:
