@@ -1,3 +1,4 @@
+import ghidra.app.util.headless.HeadlessScript
 import ghidra.app.services
 import os
 from ghidra.program.model.lang import Register
@@ -7,9 +8,9 @@ from ghidra.app.services import AbstractAnalyzer
 ELF_32BIT                   = 0x1
 ELF_64BIT                   = 0x2
 HOME_DIR                    = os.path.expanduser("~")+"/.cycle2Output"
-INTERESTING_INSTR           = list(("CALL", "JMP", "RET"))
+INTERESTING_INSTR           = list(("JMP", "RET"))
 HELPFUL_INSTR               = list(("NOP", "POP", "PUSH", "MOV", "ADD", "SUB", "MUL", "DIV", "XOR"))
-GADGET_COUNT                = 0
+
 
 def isStartInstruction(instruction):
     retValue = False
@@ -22,17 +23,17 @@ def isStartInstruction(instruction):
     return retValue
 
 def makeGadget(instr, gadgetList):
-    outputFile = open(HOME_DIR+"/"+"roptest.txt", "w")
-    global GADGET_COUNT
+    programName = currentProgram.getName()
+        
+    outputFile = open(HOME_DIR+"/"+programName+"_roptest.txt", "w")
     if instr.getMnemonicString() in HELPFUL_INSTR:
         gadgetList.append(instr)
-        GADGET_COUNT += 1
         makeGadget(instr.getPrevious(), gadgetList)
         
         for index in range(len(gadgetList)-1, -1, -1):
             tempInstr = gadgetList[index]
             if index == len(gadgetList) - 1:
-                outputFile.write(tempInstr.getMinAddress().toString()+";")
+                outputFile.write(tempInstr.getMinAddress().toString()+": ")
             outputFile.write(tempInstr.toString() +";")
         outputFile.write("\n")
         del gadgetList[:]

@@ -73,7 +73,7 @@ if __name__ == "__main__":
 
     programName = currentProgram.getName()
     programPath = currentProgram.getExecutablePath().rstrip(programName)
-
+    
     programInfo = dict()
     programInfo["Path"] = programPath
     programInfo["Name"] = programName
