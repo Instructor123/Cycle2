@@ -1,23 +1,23 @@
-# Cycle 2
+# Cycle 5
 ## Details
 - Course: CSC842 Security Tool Development
 - Developer: Alex Wollman
 - Language: Python 2.7 (Jython technically)
 - Scope: File Analysis/Exploitation
 ## Description
-In this cycle I'm creating headless python scripts for Ghidra 9.2.3. The purpose is to build a suite of scripts which can be run in bulk analysis through Ghidra's 'analyseHeadless' tool. Scripts will range from simple analysis (finding functions, starting addresses, number of arguments, etc.) to exploitation assistance.
+I'm creating more scripts this cycle, basically extending the work from cycle 3. Instead of headless scripts this time however I'm writing 'normal' Ghidra Scripts designed to be run from the GUI. In addition I'm starting work on a module to offer an interface for all of the scripts and their output. The design goal is to write several scripts that do one thing, then combine them through the module to offer many different capabilities without having to rewrite everything. This will also offer one place to do analysis, instead of tracking data through the script output.
 ## Capabilities
-### Main's functions
-The first script finds main and all of the called functions within main. Here a called function means a non-standard library function, or something that is resolved through the PLT/GOT process. The output is formatted in a JSON file and saved in the home directory under a hidden folder called ".cycle2Output." A better name and location would be preferred. Each file analyzed gets its own file, which will help with analysis after the fact. Currently only JSON is supported as an output file format.
+### callTrace
+I'm taking the idea of finding function calls in main and extending it. Now I'm looking for all functions and dividing them into Thunked (library functions) and non-thunked (user functions.) Again this will not always result in a clean split of 'user' and 'library' but it gets started in the right direction. From here the script begins new work by retrieving the arguments to these functions. The eventual goal is to enable tracing of arguments to see where values were initially assigned or created in a different script.
 
-The purpose of this function is to give the analyst an idea of how "big" the program is and how many user defined functions exist within the program. Future work could include providing how big the function is (how many 'lines' it is comprised of) and any calls made from within that function.
+The reason behind variable tracking stems from vulnerability hunting. In a world where strcpy is (or was if you're in denial) used, we want to find out if the contents of the source can in any way be controlled. If this strcpy is nested four, five, or more functions deep all while passing around the buffer it can be complicated and time consuming tracking this data. The goal of this script is to make that process easier.
 
-### ROP Tool
-This fledgling script is loosely based off the excellent work done by Chris Eagle and Kara Nance in their book "The Ghidra Book." Trying to find (and build) ROP gadgets is a very large problem that has many different nuances and rabbit holes. What is attempted in this script is the beginning of a ROP gadget locator/creator that runs in headless mode. Much like the previous script, the output files are located under the hidden folder ".cycle2Output", with each input file creating a cooresponding output file. This file is not JSON formatted, but instead contains a possible gadget on each line.
+### topDownArgumentTrace
+One of the useful features of the GUI is you can double click on the output in the script and it will take you to that address. This is what the callTrace script will provide. This script will take the arguments to the function you're currently on and finds the stack location of the arguments. The next goal will be to track where those arguments are used within the function, and follow them through all the subsequent calls (and nested calls) of the program.
 
-As this is just the very beginning steps of the script the gadgets are, quite honestly, useless. The script keys off of 'JMP' and 'RET' instructions to begin its gadget search, working backwards to identify the other operations. This method obviously does not take advantage of any problems inherent with the RISC design to locate/create gadgets, but it is a starting place.
+One of the limiting factors in this script is architecture. The calling convention most drastically changes depending on if we're in 32 or 64 bit (it changes depending on other factors too but this is what I'm focusing on right now.) 32-bit, for the most part, uses the stack to pass arguments to functions whereas 64-bit *primarily* uses registers. Linux/Mac/Windows comes into play here as well, so this becomes a very complicated task very quickly in the general case.
 
-## Usage
-There is plenty of documentation available for Ghidra, so instead of repeating everything, below are the commands that will execute the scripts. The first command creates the project (if it doesn't exist) TestProject and imports all the files under the exec/ folder. This triggers analysis and all of the usual analyzers that run when you start Ghidra normally. The second command skips the analysis step. This is useful when you've already imported/analyzed the binaries and you only want to run scripts. 
-- analyzeHeadless ~/ghidraProjects/ghidra_9.2.3/ TestProject/ -import ~/exec/* -postScript headless_FindingMain.py -postScript rop_tool.py
-- analyzeHeadless ~/ghidraProjects/ghidra_9.2.3/ TestProject/ -process -noanalysis -postScript headless_FindingMain.py -postScript rop_tool.py
+## Future Work
+The obvious extension of the callTrace is to implement the argument feature. This is currently being done in the topDown script (which is maybe where it deserves to live anyway) so there's definitely room to expand. 
+
+The topDownArgumentTrace turned into a rather complex script, despite it not really doing much. There are lots of different edges and checks that needed to be done, so the next obvious goal would be to expand out the different checks it makes and instructions it looks for. Optimization will most definitely be an issue on the horizon as chasing rabbit holes could be a real problem.
