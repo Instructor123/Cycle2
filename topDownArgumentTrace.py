@@ -14,42 +14,78 @@ import ghidra.app.script.GhidraScript
     which stores the value onto the stack and examine the previous instruction to see if the register is the destination. If it is then I've
     found the relevant instruction, if it isn't I have to keep looking. 
     
-    TODO:
-        *Determine how many far to look back before I determine an unsuccessful lookup and cut my losses.
+    UPDATE:
+    The problem:
+       prior to the call there can be (at minimum) 2 different ways of setting up the call
+           push ABC
+           push XXX
+           call ...
+        OR
+            MOV ABC, ZZZ
+            push ABC
+            LEA XXX, YYY
+            push XXX
+            call ...
+    This makes it more difficult to track down which arguments are located where.
+    
+    What we know:
+        * The function knows how many arguments to expect, so we know how many PUSH instructions to look for.
+        * Since we know the PUSH count, we also know the LEA count.
+    
+    What does this mean:
+        Once we find a push we can add the register to a list and track if we've found an LEA which stores a value there.
+        Once found we can print that stuff to the screen, remove it from the list, and continue on.
+    
+    Way Forward:
+        Move up the instructions and store PUSH instructions in one list (or their address) and anything else with a matching destination into
+        another list. The benefit here is that as we move up we MUST encounter the PUSH before the associated LEA otherwise we'd be PUSHing an
+        incorrect value. This will prevent us missing an LEA that we care about.
 '''
 def evaluateELF32Function(currAddr, func):
     #Find out how many arguments I need to find.
     argCount = func.getParameterCount()
-    
-    if 1 <= argCount:
-        #Since this is 32bit elf everything will be passed on the stack, so start looking for push arguments at the called address
+    #likely not a complete list - maybe ghidra has something?
+    regList = list(("EAX", "EBX", "ECX", "EDX"))
+                
+    #This involves more stepping so we'll create a local variable to modify and move
+    localAddr = currAddr
+    pushRegList = list()
+    otherList = list()  #This could be empty depending on the scenario
+    while argCount > 0:
         prevInstr = getInstructionAt(currAddr).getPrevious()
-    
-        if "PUSH" != prevInstr.getMnemonicString():
-            print("Something is awry...previous instruction should be a PUSH. Exiting...")
+        if "PUSH" == prevInstr.getMnemonicString():
+            pushRegList.append(prevInstr.getDefaultOperandRepresentation(0))
+            argCount -= 1
         else:
-            '''
-                TODO: Will likely need to create a loop here for functions with multiple arguments
-            '''
-            #Retrieve the register used by PUSH. There should only ever be 1 operand for PUSH but just in case...
-            numOfOperands = prevInstr.getNumOperands()
-            regOfInterest = prevInstr.getDefaultOperandRepresentation(numOfOperands-1)
-            
-            #Retrieve previous instruction to see if this is where the register was assigned a value
-            prevInstr = prevInstr.getPrevious()
-            
-            #The possible previous instruction will be very difficult to know. We can limit it slightly, but there are a lot of possibilities
-            destString, sourceString = retrieveOperands(prevInstr)
-            
-            if regOfInterest == destString:
-                if "EBP" in sourceString:
-                    print("FOUND")
-    else:
-        print("Shouldn't be here...There are no arguments.")
-            
-            
-            
+            otherList.append(prevInstr)
+        currAddr = prevInstr.getAddress()
+    
+    #TODO: Fix this argCount reset to not be necessary.
+    argCount = func.getParameterCount()
+    #If this list is not empty we need to find out if the destination matches any of the PUSH registers
+    if 0 != len(otherList):
+        for instr in otherList:
+            destLoc, source = retrieveOperands(instr)
+            if destLoc in pushRegList:
+                print(destLoc, source)
+                argCount -= 1
+                pushRegList.remove(destLoc)
+    
+    #first check if any of the values are immediates; if they are we print it and we're done.
+    for value in pushRegList:
+        if value not in regList:
+            print(value)
+            argCount -= 1
 
+    #if it's greater than 0 we still have to locate a register, and pushRegList is not empty.
+    while argCount > 0:
+        prevInstr = prevInstr.getPrevious()
+        destLoc, source = retrieveOperands(prevInstr)
+        
+        if destLoc != None and source != None:
+            print(destLoc, source)
+            argCount -= 1
+            
 def retrieveFunction(addr):
     instr = getInstructionAt(addr)
     retValue = None
@@ -75,6 +111,10 @@ def retrieveOperands(instr):
     
     #LEA should only have 2 operands: destination and source. However to be cautious...
     if "LEA" == mnemonic:
+        operandCount = instr.getNumOperands()
+        dest = instr.getDefaultOperandRepresentation(operandCount - 2)
+        source = instr.getDefaultOperandRepresentation(operandCount - 1)
+    elif "MOV" == mnemonic:
         operandCount = instr.getNumOperands()
         dest = instr.getDefaultOperandRepresentation(operandCount - 2)
         source = instr.getDefaultOperandRepresentation(operandCount - 1)
@@ -111,3 +151,10 @@ if __name__ == "__main__":
         func = retrieveFunction(addr)
         if None != func:
             evaluateELF32Function(addr, func)
+            
+            
+            
+            
+            
+            
+            
