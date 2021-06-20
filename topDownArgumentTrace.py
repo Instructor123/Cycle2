@@ -1,4 +1,4 @@
-#Traces the arguments to the current function through any subsequent function calls. Will not do anything on thunked functions.
+#Locates the arguments to the current funtions and displays them to the user.
 #@author Alex Wollman
 #@category Python.GhidraScript.Analysis
 #@keybinding
@@ -85,7 +85,7 @@ def evaluateELF32Function(currAddr, func):
         if destLoc != None and source != None:
             print(destLoc, source)
             argCount -= 1
-            
+
 def retrieveFunction(addr):
     instr = getInstructionAt(addr)
     retValue = None
